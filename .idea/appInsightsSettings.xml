@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.haleharmony" />
+                  <option name="mobileSdkAppId" value="1:549654645692:android:a740d8c112f9417e4af9b9" />
+                  <option name="projectId" value="haleharmony-6122e" />
+                  <option name="projectNumber" value="549654645692" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

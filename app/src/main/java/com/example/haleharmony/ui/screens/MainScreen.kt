@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -51,6 +52,24 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
+fun HaleHarmonyApp() {
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "login") {
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("main") { popUpTo("login") { inclusive = true } }
+                }
+            )
+        }
+        composable("main") {
+            MainScreen()
+        }
+    }
+}
+
+@Composable
 fun MainScreen() {
     val navController = rememberNavController()
     Scaffold(
@@ -70,43 +89,45 @@ fun MainScreen() {
 }
 
 @Composable
-fun ChoresScreen(choresViewModel: ChoresViewModel = viewModel()) {
+fun ChoresScreen(choresViewModel: ChoresViewModel = viewModel(factory = ChoresViewModel.Factory)) {
     val uiState by choresViewModel.uiState.collectAsState()
+    var showAddChoreDialog by remember { mutableStateOf(false) }
+    var showReassignChoreDialog by remember { mutableStateOf<Chore?>(null) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { choresViewModel.showAddChoreDialog() }) {
+        Button(onClick = { showAddChoreDialog = true }) {
             Text("Add Chore")
         }
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(uiState.chores) { chore ->
+            items(uiState.chores, key = { it.id }) { chore ->
                 ChoreItem(
                     chore = chore, 
-                    onChoreCompletedChanged = { choresViewModel.toggleChoreCompletion(chore.id) },
+                    onChoreCompletedChanged = { choresViewModel.toggleChoreCompletion(chore.id, !chore.isCompleted) },
                     onDeleteChore = { choresViewModel.deleteChore(chore.id) },
-                    onReassignChore = { choresViewModel.showReassignChoreDialog(chore) }
+                    onReassignChore = { showReassignChoreDialog = chore }
                 )
             }
         }
     }
 
-    if (uiState.showAddChoreDialog) {
+    if (showAddChoreDialog) {
         AddChoreDialog(
             onAddChore = { name, assignedTo ->
                 choresViewModel.addChore(name, assignedTo)
-                choresViewModel.dismissAddChoreDialog()
+                showAddChoreDialog = false
             },
-            onDismiss = { choresViewModel.dismissAddChoreDialog() }
+            onDismiss = { showAddChoreDialog = false }
         )
     }
 
-    if (uiState.showReassignChoreDialog) {
+    showReassignChoreDialog?.let { chore ->
         ReassignChoreDialog(
-            chore = uiState.choreToReassign!!,
-            onReassignChore = { chore, newAssignee ->
+            chore = chore,
+            onReassignChore = { newAssignee ->
                 choresViewModel.reassignChore(chore.id, newAssignee)
-                choresViewModel.dismissReassignChoreDialog()
+                showReassignChoreDialog = null
             },
-            onDismiss = { choresViewModel.dismissReassignChoreDialog() }
+            onDismiss = { showReassignChoreDialog = null }
         )
     }
 }
@@ -129,7 +150,7 @@ fun ChoreItem(chore: Chore, onChoreCompletedChanged: () -> Unit, onDeleteChore: 
         }
         Text(
             text = if (chore.isCompleted) "Complete" else "Not Complete",
-            color = if (chore.isCompleted) Color.Green else Color.Red
+            color = if (chore.isCompleted) Color.Green else Color(0xFF967BB6)
         )
         IconButton(onClick = onReassignChore) {
             Icon(Icons.Default.Person, contentDescription = "Reassign Chore")
@@ -183,7 +204,7 @@ fun AddChoreDialog(onAddChore: (String, String) -> Unit, onDismiss: () -> Unit) 
 }
 
 @Composable
-fun ReassignChoreDialog(chore: Chore, onReassignChore: (Chore, String) -> Unit, onDismiss: () -> Unit) {
+fun ReassignChoreDialog(chore: Chore, onReassignChore: (String) -> Unit, onDismiss: () -> Unit) {
     var newAssignee by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -206,7 +227,7 @@ fun ReassignChoreDialog(chore: Chore, onReassignChore: (Chore, String) -> Unit, 
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Button(onClick = { 
-                        onReassignChore(chore, newAssignee)
+                        onReassignChore(newAssignee)
                     }) {
                         Text("Reassign")
                     }
@@ -218,31 +239,32 @@ fun ReassignChoreDialog(chore: Chore, onReassignChore: (Chore, String) -> Unit, 
 
 
 @Composable
-fun BillsScreen(billsViewModel: BillsViewModel = viewModel()) {
+fun BillsScreen(billsViewModel: BillsViewModel = viewModel(factory = BillsViewModel.Factory)) {
     val uiState by billsViewModel.uiState.collectAsState()
+    var showAddBillDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { billsViewModel.showAddBillDialog() }) {
+        Button(onClick = { showAddBillDialog = true }) {
             Text("Add Bill")
         }
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(uiState.bills) { bill ->
+            items(uiState.bills, key = { it.id }) { bill ->
                 BillItem(
                     bill = bill, 
-                    onBillPaidChanged = { billsViewModel.toggleBillPaid(bill.id) },
+                    onBillPaidChanged = { billsViewModel.toggleBillPaid(bill.id, !bill.isPaid) },
                     onDeleteBill = { billsViewModel.deleteBill(bill.id) }
                 )
             }
         }
     }
 
-    if (uiState.showAddBillDialog) {
+    if (showAddBillDialog) {
         AddBillDialog(
             onAddBill = { name, amount ->
-                billsViewModel.addBill(name, amount, Date()) // Using current date for simplicity
-                billsViewModel.dismissAddBillDialog()
+                billsViewModel.addBill(name, amount, Date().time) // Using current date for simplicity
+                showAddBillDialog = false
             },
-            onDismiss = { billsViewModel.dismissAddBillDialog() }
+            onDismiss = { showAddBillDialog = false }
         )
     }
 }
@@ -262,7 +284,7 @@ fun BillItem(bill: Bill, onBillPaidChanged: () -> Unit, onDeleteBill: () -> Unit
             Text(text = bill.name)
             Text(text = "$${String.format("%.2f", bill.amount)}")
         }
-        Text(text = "Due: ${dateFormat.format(bill.dueDate)}")
+        Text(text = "Due: ${dateFormat.format(Date(bill.dueDate))}")
         IconButton(onClick = onDeleteBill) {
             Icon(Icons.Default.Delete, contentDescription = "Delete Bill")
         }
@@ -314,15 +336,16 @@ fun AddBillDialog(onAddBill: (String, Double) -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun EventsScreen(eventsViewModel: EventsViewModel = viewModel()) {
+fun EventsScreen(eventsViewModel: EventsViewModel = viewModel(factory = EventsViewModel.Factory)) {
     val uiState by eventsViewModel.uiState.collectAsState()
+    var showAddEventDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { eventsViewModel.showAddEventDialog() }) {
+        Button(onClick = { showAddEventDialog = true }) {
             Text("Add Event")
         }
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(uiState.events) { event ->
+            items(uiState.events, key = { it.id }) { event ->
                 EventItem(
                     event = event,
                     onDeleteEvent = { eventsViewModel.deleteEvent(event.id) }
@@ -331,20 +354,20 @@ fun EventsScreen(eventsViewModel: EventsViewModel = viewModel()) {
         }
     }
 
-    if (uiState.showAddEventDialog) {
+    if (showAddEventDialog) {
         AddEventDialog(
-            onAddEvent = { name, description ->
-                eventsViewModel.addEvent(name, Date(), description)
-                eventsViewModel.dismissAddEventDialog()
+            onAddEvent = { name, dateTime, description ->
+                eventsViewModel.addEvent(name, dateTime, description)
+                showAddEventDialog = false
             },
-            onDismiss = { eventsViewModel.dismissAddEventDialog() }
+            onDismiss = { showAddEventDialog = false }
         )
     }
 }
 
 @Composable
 fun EventItem(event: Event, onDeleteEvent: () -> Unit) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy, hh:mm a", Locale.getDefault())
 
     Row(
         modifier = Modifier
@@ -356,7 +379,7 @@ fun EventItem(event: Event, onDeleteEvent: () -> Unit) {
             Text(text = event.name)
             Text(text = event.description, style = androidx.compose.ui.text.TextStyle(color = Color.Gray))
         }
-        Text(text = dateFormat.format(event.date))
+        Text(text = dateFormat.format(Date(event.dateTime)))
         IconButton(onClick = onDeleteEvent) {
             Icon(Icons.Default.Delete, contentDescription = "Delete Event")
         }
@@ -364,9 +387,10 @@ fun EventItem(event: Event, onDeleteEvent: () -> Unit) {
 }
 
 @Composable
-fun AddEventDialog(onAddEvent: (String, String) -> Unit, onDismiss: () -> Unit) {
+fun AddEventDialog(onAddEvent: (name: String, dateTime: Long, description: String) -> Unit, onDismiss: () -> Unit) {
     var eventName by remember { mutableStateOf("") }
     var eventDescription by remember { mutableStateOf("") }
+    var eventDateTimeStr by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -388,6 +412,13 @@ fun AddEventDialog(onAddEvent: (String, String) -> Unit, onDismiss: () -> Unit) 
                     label = { Text("Description") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = eventDateTimeStr,
+                    onValueChange = { eventDateTimeStr = it },
+                    label = { Text("Date (MM/dd/yyyy)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 Row {
                     Button(onClick = onDismiss) {
@@ -395,7 +426,13 @@ fun AddEventDialog(onAddEvent: (String, String) -> Unit, onDismiss: () -> Unit) 
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Button(onClick = { 
-                        onAddEvent(eventName, eventDescription)
+                        val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        val dateTime = try {
+                            dateFormat.parse(eventDateTimeStr)?.time ?: Date().time
+                        } catch (e: Exception) {
+                            Date().time
+                        }
+                        onAddEvent(eventName, dateTime, eventDescription)
                     }) {
                         Text("Add")
                     }
@@ -406,15 +443,16 @@ fun AddEventDialog(onAddEvent: (String, String) -> Unit, onDismiss: () -> Unit) 
 }
 
 @Composable
-fun VisitorsScreen(visitorsViewModel: VisitorsViewModel = viewModel()) {
+fun VisitorsScreen(visitorsViewModel: VisitorsViewModel = viewModel(factory = VisitorsViewModel.Factory)) {
     val uiState by visitorsViewModel.uiState.collectAsState()
+    var showAddVisitorDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Button(onClick = { visitorsViewModel.showAddVisitorDialog() }) {
+        Button(onClick = { showAddVisitorDialog = true }) {
             Text("Add Visitor")
         }
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(uiState.visitors) { visitor ->
+            items(uiState.visitors, key = { it.id }) { visitor ->
                 VisitorItem(
                     visitor = visitor,
                     onDeleteVisitor = { visitorsViewModel.deleteVisitor(visitor.id) }
@@ -423,20 +461,20 @@ fun VisitorsScreen(visitorsViewModel: VisitorsViewModel = viewModel()) {
         }
     }
 
-    if (uiState.showAddVisitorDialog) {
+    if (showAddVisitorDialog) {
         AddVisitorDialog(
-            onAddVisitor = { name ->
-                visitorsViewModel.addVisitor(name, Date(), Date()) // Using current date for simplicity
-                visitorsViewModel.dismissAddVisitorDialog()
+            onAddVisitor = { name, arrival, departure ->
+                visitorsViewModel.addVisitor(name, arrival, departure)
+                showAddVisitorDialog = false
             },
-            onDismiss = { visitorsViewModel.dismissAddVisitorDialog() }
+            onDismiss = { showAddVisitorDialog = false }
         )
     }
 }
 
 @Composable
 fun VisitorItem(visitor: Visitor, onDeleteVisitor: () -> Unit) {
-    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy, hh:mm a", Locale.getDefault())
 
     Row(
         modifier = Modifier
@@ -446,8 +484,8 @@ fun VisitorItem(visitor: Visitor, onDeleteVisitor: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = visitor.name)
-            Text(text = "Arrives: ${dateFormat.format(visitor.arrivalDate)}")
-            Text(text = "Departs: ${dateFormat.format(visitor.departureDate)}")
+            Text(text = "Arrives: ${dateFormat.format(Date(visitor.arrivalDateTime))}")
+            Text(text = "Departs: ${dateFormat.format(Date(visitor.departureDateTime))}")
         }
         IconButton(onClick = onDeleteVisitor) {
             Icon(Icons.Default.Delete, contentDescription = "Delete Visitor")
@@ -456,8 +494,10 @@ fun VisitorItem(visitor: Visitor, onDeleteVisitor: () -> Unit) {
 }
 
 @Composable
-fun AddVisitorDialog(onAddVisitor: (String) -> Unit, onDismiss: () -> Unit) {
+fun AddVisitorDialog(onAddVisitor: (String, Date, Date) -> Unit, onDismiss: () -> Unit) {
     var visitorName by remember { mutableStateOf("") }
+    var arrivalDateTimeStr by remember { mutableStateOf("") }
+    var departureDateTimeStr by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -472,6 +512,20 @@ fun AddVisitorDialog(onAddVisitor: (String) -> Unit, onDismiss: () -> Unit) {
                     label = { Text("Visitor name") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = arrivalDateTimeStr,
+                    onValueChange = { arrivalDateTimeStr = it },
+                    label = { Text("Arrival (MM/dd/yyyy)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = departureDateTimeStr,
+                    onValueChange = { departureDateTimeStr = it },
+                    label = { Text("Departure (MM/dd/yyyy)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 Row {
                     Button(onClick = onDismiss) {
@@ -479,7 +533,10 @@ fun AddVisitorDialog(onAddVisitor: (String) -> Unit, onDismiss: () -> Unit) {
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Button(onClick = { 
-                        onAddVisitor(visitorName)
+                        val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+                        val arrival = try { dateFormat.parse(arrivalDateTimeStr) ?: Date() } catch (e: Exception) { Date() }
+                        val departure = try { dateFormat.parse(departureDateTimeStr) ?: Date() } catch (e: Exception) { Date() }
+                        onAddVisitor(visitorName, arrival, departure)
                     }) {
                         Text("Add")
                     }

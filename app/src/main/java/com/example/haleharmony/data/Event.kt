@@ -1,11 +1,14 @@
 package com.example.haleharmony.data
 
-import java.util.Date
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import java.util.UUID
 
+@Entity(tableName = "events")
 data class Event(
-    val id: UUID = UUID.randomUUID(),
+    @PrimaryKey
+    val id: String = UUID.randomUUID().toString(),
     val name: String,
-    val date: Date,
+    val dateTime: Long,
     val description: String
 )

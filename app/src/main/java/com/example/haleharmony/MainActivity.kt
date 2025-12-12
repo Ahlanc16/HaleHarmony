@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.haleharmony.ui.screens.MainScreen
+import com.example.haleharmony.ui.screens.HaleHarmonyApp
 import com.example.haleharmony.ui.theme.HaleHarmonyTheme
 
 class MainActivity : ComponentActivity() {
@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             HaleHarmonyTheme {
-                MainScreen()
+                HaleHarmonyApp()
             }
         }
     }

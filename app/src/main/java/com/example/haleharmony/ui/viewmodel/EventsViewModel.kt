@@ -1,48 +1,57 @@
 package com.example.haleharmony.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.haleharmony.HaleHarmonyApplication
 import com.example.haleharmony.data.Event
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.haleharmony.data.EventsRepository
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import java.util.Date
-import java.util.UUID
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class EventsViewModel : ViewModel() {
+data class EventsScreenUiState(
+    val events: List<Event> = listOf()
+)
 
-    private val _uiState = MutableStateFlow(EventsUiState())
-    val uiState: StateFlow<EventsUiState> = _uiState.asStateFlow()
+class EventsViewModel(private val eventsRepository: EventsRepository) : ViewModel() {
 
-    init {
-        // example data
-        _uiState.value = EventsUiState(
-            events = listOf(
-                Event(name = "Movie Night", date = Date(), description = "Watch the new blockbuster"),
-                Event(name = "Game Night", date = Date(), description = "Play some board games")
+    val uiState: StateFlow<EventsScreenUiState> =
+        eventsRepository.getAllEventsStream().map { EventsScreenUiState(events = it) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = EventsScreenUiState()
             )
-        )
-    }
-// adds events
-    fun addEvent(name: String, date: Date, description: String) {
-        val newEvent = Event(name = name, date = date, description = description)
-        _uiState.update {
-            it.copy(events = it.events + newEvent)
+
+    fun addEvent(name: String, dateTime: Long, description: String) {
+        viewModelScope.launch {
+            val newEvent = Event(
+                name = name,
+                dateTime = dateTime,
+                description = description
+            )
+            eventsRepository.insertEvent(newEvent)
         }
-    }
-// delete events
-    fun deleteEvent(eventId: UUID) {
-        _uiState.update { currentState ->
-            val updatedEvents = currentState.events.filter { it.id != eventId }
-            currentState.copy(events = updatedEvents)
-        }
-    }
-//shows everything
-    fun showAddEventDialog() {
-        _uiState.update { it.copy(showAddEventDialog = true) }
     }
 
-    fun dismissAddEventDialog() {
-        _uiState.update { it.copy(showAddEventDialog = false) }
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch {
+            eventsRepository.deleteEvent(eventId)
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HaleHarmonyApplication)
+                val eventsRepository = application.container.eventsRepository
+                EventsViewModel(eventsRepository = eventsRepository)
+            }
+        }
     }
 }

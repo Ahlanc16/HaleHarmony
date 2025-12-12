@@ -1,82 +1,67 @@
 package com.example.haleharmony.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.haleharmony.HaleHarmonyApplication
 import com.example.haleharmony.data.Chore
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.haleharmony.data.ChoresRepository
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import java.util.UUID
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class ChoresViewModel : ViewModel() {
+data class ChoresScreenUiState(
+    val chores: List<Chore> = listOf(),
+    val showAddChoreDialog: Boolean = false,
+    val showReassignChoreDialog: Boolean = false,
+    val choreToReassign: Chore? = null
+)
 
-    private val _uiState = MutableStateFlow(ChoresUiState())
-    val uiState: StateFlow<ChoresUiState> = _uiState.asStateFlow()
+class ChoresViewModel(private val choresRepository: ChoresRepository) : ViewModel() {
 
-    init {
-        // example data
-        _uiState.value = ChoresUiState(
-            chores = listOf(
-                Chore(name = "Take out the trash", assignedTo = "Alex"),
-                Chore(name = "Do the dishes", assignedTo = "Ben", isCompleted = true),
-                Chore(name = "Clean the bathroom", assignedTo = "Charlie")
+    val uiState: StateFlow<ChoresScreenUiState> =
+        choresRepository.getAllChoresStream().map { ChoresScreenUiState(chores = it) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = ChoresScreenUiState()
             )
-        )
-    }
-    // adding chores
+
     fun addChore(name: String, assignedTo: String) {
-        val newChore = Chore(name = name, assignedTo = assignedTo)
-        _uiState.update {
-            it.copy(chores = it.chores + newChore)
+        viewModelScope.launch {
+            val newChore = Chore(name = name, assignedTo = assignedTo)
+            choresRepository.insertChore(newChore)
         }
     }
-    // deleting chores
-    fun deleteChore(choreId: UUID) {
-        _uiState.update { currentState ->
-            val updatedChores = currentState.chores.filter { it.id != choreId }
-            currentState.copy(chores = updatedChores)
+
+    fun deleteChore(choreId: String) {
+        viewModelScope.launch {
+            choresRepository.deleteChore(choreId)
         }
     }
-    // reassign to another person
-    fun reassignChore(choreId: UUID, newAssignee: String) {
-        _uiState.update { currentState ->
-            val updatedChores = currentState.chores.map {
-                if (it.id == choreId) {
-                    it.copy(assignedTo = newAssignee)
-                } else {
-                    it
-                }
+
+    fun reassignChore(choreId: String, newAssignee: String) {
+        viewModelScope.launch {
+            choresRepository.reassignChore(choreId, newAssignee)
+        }
+    }
+
+    fun toggleChoreCompletion(choreId: String, isCompleted: Boolean) {
+        viewModelScope.launch {
+            choresRepository.updateChoreCompletion(choreId, isCompleted)
+        }
+    }
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HaleHarmonyApplication)
+                val choresRepository = application.container.choresRepository
+                ChoresViewModel(choresRepository = choresRepository)
             }
-            currentState.copy(chores = updatedChores)
         }
-    }
-    // tells user if its complete or not
-    fun toggleChoreCompletion(choreId: UUID) {
-        _uiState.update { currentState ->
-            val updatedChores = currentState.chores.map {
-                if (it.id == choreId) {
-                    it.copy(isCompleted = !it.isCompleted)
-                } else {
-                    it
-                }
-            }
-            currentState.copy(chores = updatedChores)
-        }
-    }
-
-    fun showAddChoreDialog() {
-        _uiState.update { it.copy(showAddChoreDialog = true) }
-    }
-
-    fun dismissAddChoreDialog() {
-        _uiState.update { it.copy(showAddChoreDialog = false) }
-    }
-
-    fun showReassignChoreDialog(chore: Chore) {
-        _uiState.update { it.copy(showReassignChoreDialog = true, choreToReassign = chore) }
-    }
-
-    fun dismissReassignChoreDialog() {
-        _uiState.update { it.copy(showReassignChoreDialog = false, choreToReassign = null) }
     }
 }

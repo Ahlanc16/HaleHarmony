@@ -1,48 +1,64 @@
 package com.example.haleharmony.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.haleharmony.HaleHarmonyApplication
 import com.example.haleharmony.data.Visitor
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.haleharmony.data.VisitorsRepository
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.util.Date
-import java.util.UUID
 
-class VisitorsViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow(VisitorsUiState())
-    val uiState: StateFlow<VisitorsUiState> = _uiState.asStateFlow()
+data class VisitorsScreenUiState(
+    val visitors: List<Visitor> = listOf(),
+    val showAddVisitorDialog: Boolean = false
+)
 
-    init {
-        // data for example
-        _uiState.value = VisitorsUiState(
-            visitors = listOf(
-                Visitor(name = "Aunt Carol", arrivalDate = Date(), departureDate = Date()),
-                Visitor(name = "John", arrivalDate = Date(), departureDate = Date())
+class VisitorsViewModel(private val visitorsRepository: VisitorsRepository) : ViewModel() {
+
+    // The UI state is now directly from the repository's data flow
+    val uiState: StateFlow<VisitorsScreenUiState> = 
+        visitorsRepository.getAllVisitorsStream().map { VisitorsScreenUiState(visitors = it) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = VisitorsScreenUiState()
             )
-        )
-    }
-    // adds visitors
+
     fun addVisitor(name: String, arrivalDate: Date, departureDate: Date) {
-        val newVisitor = Visitor(name = name, arrivalDate = arrivalDate, departureDate = departureDate)
-        _uiState.update {
-            it.copy(visitors = it.visitors + newVisitor)
+        viewModelScope.launch {
+            val newVisitor = Visitor(
+                name = name,
+                // Convert Dates to Longs for database storage
+                arrivalDateTime = arrivalDate.time,
+                departureDateTime = departureDate.time
+            )
+            visitorsRepository.insertVisitor(newVisitor)
         }
     }
-    // deletes visitors
-    fun deleteVisitor(visitorId: UUID) {
-        _uiState.update { currentState ->
-            val updatedVisitors = currentState.visitors.filter { it.id != visitorId }
-            currentState.copy(visitors = updatedVisitors)
+
+    fun deleteVisitor(visitorId: String) {
+        viewModelScope.launch {
+            visitorsRepository.deleteVisitor(visitorId)
         }
     }
-    // shows visitors
-    fun showAddVisitorDialog() {
-        _uiState.update { it.copy(showAddVisitorDialog = true) }
-    }
-    // dismisses visitors
-    fun dismissAddVisitorDialog() {
-        _uiState.update { it.copy(showAddVisitorDialog = false) }
+    /**
+     * Factory for creating [VisitorsViewModel] instances.
+     */
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HaleHarmonyApplication)
+                val visitorsRepository = application.container.visitorsRepository
+                VisitorsViewModel(visitorsRepository = visitorsRepository)
+            }
+        }
     }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "549654645692",
+    "project_id": "haleharmony-6122e",
+    "storage_bucket": "haleharmony-6122e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549654645692:android:a740d8c112f9417e4af9b9",
+        "android_client_info": {
+          "package_name": "com.example.haleharmony"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaj-0sKAuJtmRw-oxM9cqcA7dmLhRbBPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,62 +1,63 @@
 package com.example.haleharmony.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.haleharmony.HaleHarmonyApplication
 import com.example.haleharmony.data.Bill
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.example.haleharmony.data.BillsRepository
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import java.util.Date
-import java.util.UUID
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class BillsViewModel : ViewModel() {
+data class BillsScreenUiState(
+    val bills: List<Bill> = listOf()
+)
 
-    private val _uiState = MutableStateFlow(BillsUiState())
-    val uiState: StateFlow<BillsUiState> = _uiState.asStateFlow()
+class BillsViewModel(private val billsRepository: BillsRepository) : ViewModel() {
 
-    init {
-        // example data
-        _uiState.value = BillsUiState(
-            bills = listOf(
-                Bill(name = "Rent", amount = 1200.00, dueDate = Date()),
-                Bill(name = "Internet", amount = 60.00, dueDate = Date(), isPaid = true),
-                Bill(name = "Electricity", amount = 75.50, dueDate = Date())
+    val uiState: StateFlow<BillsScreenUiState> =
+        billsRepository.getAllBillsStream().map { BillsScreenUiState(bills = it) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = BillsScreenUiState()
             )
-        )
-    }
-    // adds bills
-    fun addBill(name: String, amount: Double, dueDate: Date) {
-        val newBill = Bill(name = name, amount = amount, dueDate = dueDate)
-        _uiState.update {
-            it.copy(bills = it.bills + newBill)
+
+    fun addBill(name: String, amount: Double, dueDate: Long) {
+        viewModelScope.launch {
+            val newBill = Bill(
+                name = name,
+                amount = amount,
+                dueDate = dueDate
+            )
+            billsRepository.insertBill(newBill)
         }
     }
-    // deletes bills
-    fun deleteBill(billId: UUID) {
-        _uiState.update { currentState ->
-            val updatedBills = currentState.bills.filter { it.id != billId }
-            currentState.copy(bills = updatedBills)
+
+    fun deleteBill(billId: String) {
+        viewModelScope.launch {
+            billsRepository.deleteBill(billId)
         }
     }
-    //toggles if its paid or not
-    fun toggleBillPaid(billId: UUID) {
-        _uiState.update { currentState ->
-            val updatedBills = currentState.bills.map {
-                if (it.id == billId) {
-                    it.copy(isPaid = !it.isPaid)
-                } else {
-                    it
-                }
+
+    fun toggleBillPaid(billId: String, isPaid: Boolean) {
+        viewModelScope.launch {
+            billsRepository.updateBillPaidStatus(billId, isPaid)
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as HaleHarmonyApplication)
+                val billsRepository = application.container.billsRepository
+                BillsViewModel(billsRepository = billsRepository)
             }
-            currentState.copy(bills = updatedBills)
         }
-    }
-
-    fun showAddBillDialog() {
-        _uiState.update { it.copy(showAddBillDialog = true) }
-    }
-
-    fun dismissAddBillDialog() {
-        _uiState.update { it.copy(showAddBillDialog = false) }
     }
 }
